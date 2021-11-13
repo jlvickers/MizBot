@@ -33,9 +33,7 @@ class UserData:
 
 
 bot = commands.Bot(command_prefix='v!')
-domain = '@umsystem.edu'
-domain2 = '@missouri.edu'
-domain3 = '@mail.missouri.edu'
+domains = ['@umsystem.edu','@missouri.edu','@mail.missouri.edu']
 subject = 'Mizzou Esports Discord Verification'
 userlist = []
 try:
@@ -48,18 +46,18 @@ except:
 
 @bot.event
 async def on_ready():
-    print("logged in as")
-    print(bot.user.name)
-    print(bot.user.id)
+    print("logged in as \n{} \n{}".format(bot.user.name, bot.user.id))
     print("------")
 
+# executes function when reaction is added to the message which message_id specifies. In the use case, this was a message with instructions on how the verification bot works.
 @bot.event
 async def on_raw_reaction_add(payload):
     message_id = payload.message_id
     p1 = None
-    print(payload.emoji)
-    if not message_id == 747177247403671705:
+    if message_id != 747177247403671705:
         return
+    
+    # checks payload name for correct emoji reactions and executes accordingly
     if payload.emoji.name == 'Tiger':
         email = ""
         vernum = struct.unpack('H', os.urandom(2))
@@ -77,27 +75,27 @@ async def on_raw_reaction_add(payload):
             userlist.append(p1)
         await payload.member.send("Reply in this DM thread with your UM Systems email address using v!email <email address>")
         await payload.member.send("If you have issues obtaining a role, check out #verification-questions or DM Skiritai#1478.")
+
+# checks if the channel it's evoked in is a direct message channel, checks if the email provided is a valid MU domain. If so, sends an email and provides instructions accordingly.
 @bot.command()
-async def email(ctx, arg):
+async def email(ctx, email):
     if isinstance(ctx.channel, discord.channel.DMChannel):
-        if domain in arg or domain2 in arg or domain3 in arg:
+        if any(x in email for x in domains):
             for idx, val in enumerate(userlist):
                 if ctx.author.id == val.id:
-                    index = idx
                     code = val.code
-                    id = val.id
-                    userlist[idx].email = arg
-            email = arg
+                    userlist[idx].email = email
+            email = email
             content = 'Your verification code is {0}. Reply to the discord bot in DMs with \'v!verify {0}\''.format(str(code))
             ezgmail.send(email,subject,content)
             await ctx.author.send("Thanks! Check your email for a code. If you can't find it, make sure to check your spam folder.\n Once you have your code, reply to the bot with v!verify <your code>")
             await ctx.author.send("[NOTICE] The University of Missouri's IT department will flag the email as potential phishing attack. This is not the case, and you will NEVER have to click on links or download attachments from Mizzou Esports this way.")
         else:
             await ctx.author.send("Sorry, that's not a Mizzou email.")
-            return
 
+#checks if the channel is a direct message channel, then executes logic accordingly.
 @bot.command()
-async def verify(ctx, arg):
+async def verify(ctx, code):
     if isinstance(ctx.channel, discord.channel.DMChannel):
         logging = open("VerifiedUsers.txt","a")
         vernumb = ''
@@ -112,11 +110,9 @@ async def verify(ctx, arg):
                 guild = val.getGuild()
                 email = val.getEmail()
                 MizRole = val.getRole()
-        if str(arg) == str(vernumb):
+        if str(code) == str(vernumb):
             disc = discord.utils.find(lambda g : g.id == guild, bot.guilds)
-            server = bot.get_guild(server_id)
-            if MizRole == 'Student':
-                alumRole = discord.utils.get(disc.roles, name = 'Mizzou Alum')   
+            if MizRole == 'Student': 
                 role = discord.utils.get(disc.roles, name = 'Mizzou Student')
                 removeRole = discord.utils.get(disc.roles, name = 'Unverified Mizzou Student')
                 await member.add_roles(role, atomic = True)
@@ -132,6 +128,7 @@ async def verify(ctx, arg):
         else:
             await ctx.author.send("Sorry, that's the wrong verification number")
 
+#Logging function to view all members verified from a text file. Only executable in the channel specified, which in this case was an admin only channel
 @bot.command()
 async def ReadLog(ctx):
     if ctx.channel.id == 743295692407046195:
@@ -140,3 +137,7 @@ async def ReadLog(ctx):
         logging.close()
 
 bot.run(token)
+
+# Looking back there is a lot of duplicate code I could've avoided and tightened up some logic, but for only having about 2-3 days to figure out a verification solution and learn
+# these libraries I think the outcome is good. To expand on this project idea, I would most likely hold logging information in a MySQL database where it could be parsed easier
+# and hold more information that could be useful. I would also use a different automated email solution that could be ran through a university domain rather than a gmail account.
